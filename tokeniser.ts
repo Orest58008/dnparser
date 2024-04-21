@@ -7,10 +7,7 @@ enum Token {
 	OpenBracket, CloseBracket,
 	Plus, Minus, Mult, Div,
 	// Dice symbols
-	Delimiter,
-	KeepHigh, KeepLow,
-	OneHigh, OneLow,
-	Explode,
+	Delimiter, KeepHigh, KeepLow, Explode,
 };
 
 const tokenStrings = new Map([
@@ -19,58 +16,54 @@ const tokenStrings = new Map([
 	['+', Token.Plus], ['-', Token.Minus],
 	['*', Token.Mult], ['x', Token.Mult], ['/', Token.Div],
 	['D', Token.Delimiter], ['d', Token.Delimiter],
-	['К', Token.Delimiter], ['к', Token.Delimiter],
-	['H', Token.OneHigh], ['L', Token.OneLow]
+	['H', Token.KeepHigh], ['L', Token.KeepLow],
+	['!', Token.Explode], ['X', Token.Explode],
 ]);
 
-function tokenise(input: string) : [Token, string?][] {
-	const result: [Token, string?][] = [];
+function tokenise(input: string) : [Token[], (string | undefined)[]] {
+	const tokens: Token[] = [];
+	const values: (string | undefined)[] = [];
 	
-	input.split('').forEach((char: string, index: number, array: string[]) => {
-		if (/\s/.test(char)) {
-			result.push([Token.Blank, undefined]);
-			return;
-		};
+	input.split('').forEach((char: string, i: number, a: string[]) => {
+		switch (true) {
+			case /\s/.test(char):
+				tokens.push(Token.Blank);
+				values.push(undefined);
+				
+				return;
+			case /[0-9]/.test(char):
+				if (tokens[tokens.length - 1] !== Token.Integer) {
+					tokens.push(Token.Integer);
+					values[tokens.length - 1] = char;
+				} else if (a[i - 1] === '%') {
+					throw `Invalid ${char} placement`
+				} else {
+					const int = values[values.length - 1] ?? 0;
+					values[values.length - 1] = ""+((+int)*10+(+char));
+				}
 
-		if (/[0-9]/.test(char)) {
-			const lastToken = result[result.length - 1];
-			
-			if (lastToken === undefined || lastToken[0] !== Token.Integer)
-				result.push([Token.Integer, char]);
-			else
-				result[result.length - 1][1] += char;
+				return;
+			case char === '%':
+				if (tokens[tokens.length - 1] !== Token.Integer) {
+					tokens.push(Token.Integer);
+					values[tokens.length - 1] = "100"
+				} else {
+					const int = values[values.length - 1] ?? 0;
+					values[values.length - 1] = ""+(+int * 100);
+				}
 
-			return;
-		};
-		
-		if (char === '%') {
-			result.push([Token.Integer, "100"]);
-			return;
-		};
+				return;
+			case tokenStrings.has(char):
+				// @ts-ignore : already checked
+				tokens.push(tokenStrings.get(char));
+				values.push(undefined);
 
-		if ((char === 'h' || char === 'l') && array[index - 1] === 'k')
-			return;
-
-		if (char === 'k')
-			switch (array[index + 1]) {
-				case 'h':
-					result.push([Token.KeepHigh, undefined]);
-					return;
-				case 'l':
-					result.push([Token.KeepLow, undefined]);
-					return;
-			};
-
-		const token = tokenStrings.get(char);
-		if (token) {
-			result.push([token, undefined]);
-			return;
-		};
-
-		throw `${char} is not a valid token`
-	});
+				return;
+			case true:
+				throw `${char} is not a valid token`
+		}});
 	
-	return result.filter((e) => e[0] != Token.Blank);
+	return [tokens, values];
 };
 
 export { tokenise };
